@@ -2,8 +2,8 @@ name: Ping Hugging Face Spaces (daily)
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # Runs every day at 00:00 UTC (05:30 IST)
-  workflow_dispatch:        # Allows manual trigger
+    - cron: "0 0 * * *" # every day at midnight UTC
+  workflow_dispatch:
 
 jobs:
   ping-spaces:
@@ -12,22 +12,20 @@ jobs:
       - name: Ping Hugging Face Spaces
         run: |
           set -euo pipefail
-
           SPACES=(
             "Kenox786/YoutubeHindi"
             "Kenox786/XsmartBot"
           )
 
-          for SPACE in "${SPACES[@]}"; do
-            echo "=== Pinging: https://huggingface.co/spaces/$SPACE ==="
+          for space in "${SPACES[@]}"; do
+            echo "=== Pinging: https://huggingface.co/spaces/$space ==="
             for i in {1..3}; do
               STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                -H "Authorization: Bearer ${{ secrets.HF_TOKEN }}" \
-                "https://huggingface.co/spaces/$SPACE")
-              
+                -H "Authorization: Bearer $HF_TOKEN" \
+                "https://huggingface.co/spaces/$space")
               echo "Attempt $i: HTTP $STATUS"
               if [ "$STATUS" -eq 200 ]; then
-                echo "✅ Success for $SPACE"
+                echo "✅ Success: $space"
                 break
               else
                 echo "⚠️ Failed (HTTP $STATUS), retrying..."
@@ -35,3 +33,5 @@ jobs:
               fi
             done
           done
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
