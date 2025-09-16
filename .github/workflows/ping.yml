@@ -2,56 +2,36 @@ name: Ping Hugging Face Spaces (daily)
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # once per day at 00:00 UTC (= 05:30 IST)
-  workflow_dispatch:     # lets you run it manually from Actions tab
+    - cron: "0 0 * * *"   # Runs every day at 00:00 UTC (05:30 IST)
+  workflow_dispatch:        # Allows manual trigger
 
 jobs:
   ping-spaces:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Hugging Face Spaces (with retries)
+      - name: Ping Hugging Face Spaces
         run: |
           set -euo pipefail
 
-          urls=(
-            "https://huggingface.co/spaces/Kenox786/YoutubeHindi"
-            "https://huggingface.co/spaces/Kenox786/XsmartBot"
+          SPACES=(
+            "Kenox786/YoutubeHindi"
+            "Kenox786/XsmartBot"
           )
 
-          failures=0
-
-          for u in "${urls[@]}"; do
-            echo "=== Pinging: $u ==="
-            attempt=0
-            max_attempts=3
-            success=false
-
-            while [ $attempt -lt $max_attempts ]; do
-              attempt=$((attempt+1))
-              echo "Attempt $attempt for $u ..."
-              status=$(curl -sS -o /dev/null -w "%{http_code}" --retry 2 --retry-delay 2 --max-time 20 "$u" || echo "000")
-              echo "HTTP status: $status"
-
-              if [[ "$status" -ge 200 && "$status" -lt 400 ]]; then
-                echo "OK: $u (status $status)"
-                success=true
+          for SPACE in "${SPACES[@]}"; do
+            echo "=== Pinging: https://huggingface.co/spaces/$SPACE ==="
+            for i in {1..3}; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+                -H "Authorization: Bearer ${{ secrets.HF_TOKEN }}" \
+                "https://huggingface.co/spaces/$SPACE")
+              
+              echo "Attempt $i: HTTP $STATUS"
+              if [ "$STATUS" -eq 200 ]; then
+                echo "✅ Success for $SPACE"
                 break
               else
-                echo "Warning: attempt $attempt returned $status"
-                sleep 2
+                echo "⚠️ Failed (HTTP $STATUS), retrying..."
+                sleep 5
               fi
             done
-
-            if [ "$success" = "false" ]; then
-              echo "FAILED: $u (all $max_attempts attempts failed)" >&2
-              failures=$((failures+1))
-            fi
-            echo
           done
-
-          if [ $failures -gt 0 ]; then
-            echo "One or more spaces failed to respond. See logs above." >&2
-            exit 1
-          fi
-
-          echo "All spaces responded successfully."
