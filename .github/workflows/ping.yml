@@ -1,37 +1,60 @@
-name: Ping Hugging Face Spaces (daily)
+name: Keep Hugging Face Spaces Active
 
 on:
   schedule:
-    - cron: "0 0 * * *" # every day at midnight UTC
+    # Run every 24 hours (daily at midnight UTC)
+    # This ensures spaces stay active well within the 48-hour limit
+    - cron: '0 0 * * *'  # Every 24 hours (daily at midnight UTC)
+  
+  # Allow manual triggering
   workflow_dispatch:
 
 jobs:
-  ping-spaces:
+  keep-alive:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Ping Hugging Face Spaces
-        run: |
-          set -euo pipefail
-          SPACES=(
-            "Kenox786/YoutubeHindi"
-            "Kenox786/XsmartBot"
-          )
-
-          for space in "${SPACES[@]}"; do
-            echo "=== Pinging: https://huggingface.co/spaces/$space ==="
-            for i in {1..3}; do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                -H "Authorization: Bearer $HF_TOKEN" \
-                "https://huggingface.co/spaces/$space")
-              echo "Attempt $i: HTTP $STATUS"
-              if [ "$STATUS" -eq 200 ]; then
-                echo "✅ Success: $space"
-                break
-              else
-                echo "⚠️ Failed (HTTP $STATUS), retrying..."
-                sleep 5
-              fi
-            done
-          done
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Keep Spaces Active
+      run: |
+        # Add your Hugging Face Space URLs here
+        # IMPORTANT: Use the deployed app URLs (.hf.space), NOT the repository URLs
+        SPACES=(
+          "https://Kenox786-XsmartBot.hf.space"
+          "https://Kenox786-YoutubeHindi.hf.space"
+          # Add more spaces as needed
+        )
+        
+        echo "Starting keep-alive pings..."
+        
+        for space in "${SPACES[@]}"
+        do
+          echo "Pinging: $space"
+          
+          # Make HTTP request to keep space active
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 5 \
+            "$space" || echo "000")
+          
+          if [ "$response" = "200" ]; then
+            echo "✅ Success: $space (HTTP $response)"
+          elif [ "$response" = "000" ]; then
+            echo "⚠️  Timeout/Error: $space"
+          else
+            echo "⚠️  Warning: $space (HTTP $response)"
+          fi
+          
+          # Wait 10 seconds between requests to be respectful
+          sleep 10
+        done
+        
+        echo "Keep-alive pings completed!"
+    
+    - name: Log completion
+      run: |
+        echo "Workflow completed at $(date)"
+        echo "Next run scheduled in 24 hours (daily at midnight UTC / 5:30 AM IST)"
